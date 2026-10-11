@@ -1,5 +1,5 @@
 """Publish the next unposted item from posts/queue.json to Blogger."""
-import json, os, sys, urllib.parse, urllib.request
+import json, os, sys, urllib.error, urllib.parse, urllib.request
 
 BLOG_ID = os.environ.get("BLOG_ID", "7685699494231753472")
 QUEUE = os.path.join(os.path.dirname(__file__), "..", "posts", "queue.json")
@@ -8,13 +8,20 @@ DRAFT = os.environ.get("DRAFT", "false").lower() == "true"
 
 def access_token():
     data = urllib.parse.urlencode({
-        "client_id": os.environ["GOOGLE_CLIENT_ID"],
-        "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
-        "refresh_token": os.environ["GOOGLE_REFRESH_TOKEN"],
+        "client_id": os.environ["GOOGLE_CLIENT_ID"].strip(),
+        "client_secret": os.environ["GOOGLE_CLIENT_SECRET"].strip(),
+        "refresh_token": os.environ["GOOGLE_REFRESH_TOKEN"].strip(),
         "grant_type": "refresh_token",
     }).encode()
-    with urllib.request.urlopen("https://oauth2.googleapis.com/token", data) as r:
-        return json.load(r)["access_token"]
+    for k in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"):
+        v = os.environ.get(k, "")
+        print(f"{k}: set={bool(v)} length={len(v)} has_spaces={v != v.strip()}")
+    try:
+        with urllib.request.urlopen("https://oauth2.googleapis.com/token", data) as r:
+            return json.load(r)["access_token"]
+    except urllib.error.HTTPError as e:
+        print("Token error:", e.code, e.read().decode()[:300])
+        sys.exit(1)
 
 
 def main():

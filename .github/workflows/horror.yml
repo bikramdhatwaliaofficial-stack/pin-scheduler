@@ -1,0 +1,39 @@
+name: Horror story auto post
+
+on:
+  schedule:
+    - cron: "40 14 * * *"   # daily 20:10 IST
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: "Create as draft (test)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency: repo-commits
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Write and publish story
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          DRAFT: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || 'false' }}
+        run: python scripts/horror_story.py
+      - name: Save history
+        run: |
+          git config user.name "autopost-bot"
+          git config user.email "autopost-bot@users.noreply.github.com"
+          git add stories/history.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "Add published story to history" && git pull --rebase && git push)
